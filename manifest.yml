@@ -1,0 +1,36 @@
+---
+name: microbosh
+
+network:
+  type: manual
+  vip:  172.24.4.1 
+  ip: 10.0.0.3 
+  cloud_properties:
+    net_id: 22d138c7-a9eb-47eb-98e5-73eb25c8967c
+
+resources:
+ 
+  persistent_disk: 50000
+  cloud_properties:
+    instance_type: m1.xlarge
+
+cloud:
+  plugin: openstack
+  properties:
+    openstack:
+      auth_url:         http://192.168.2.191:5000/v2.0        
+      tenant: admin # Replace with OpenStack tenant name
+      username: admin # Replace with OpenStack username
+      api_key: vedams123 # Replace with your OpenStack password
+      default_key_name: microbosh # OpenStack Keypair name
+      private_key: /home/ubuntu/my-micro-deployment/microbosh.pem # Path to OpenStack Keypair private key
+      default_security_groups: ["ssh","bosh"]
+
+apply_spec:
+  properties:
+    max_upload_size: "10000m"
+    director: {max_threads: 3}
+    hm: {resurrector_enabled: true}
+    ntp: [0.north-america.pool.ntp.org, 1.north-america.pool.ntp.org]
+
+

@@ -1,0 +1,839 @@
+---
+name: v206-mycf-11-openstack
+director_uuid: 50fddc1d-84a0-485b-88e6-463e55ec18ff
+
+releases:
+  - name: cf
+    version: 206+dev.1
+
+networks:
+  - name: cf1
+    type: dynamic
+    cloud_properties:
+        net_id: 
+        security_groups:
+          - cf-private
+          - cf
+          - cf-public
+          - bosh 
+          - ssh
+  - name: floating
+    type: vip
+    cloud_properties: {}
+
+compilation:
+  workers: 6
+  network: cf1
+  reuse_compilation_vms: true
+  cloud_properties:
+    instance_type: m1.small
+
+update:
+  canaries: 1
+  canary_watch_time: 30000-600000
+  update_watch_time: 30000-600000
+  max_in_flight: 4
+  serial: false
+
+resource_pools:
+  - name: small
+    network: cf1
+    size: 8
+    stemcell:
+      name: bosh-openstack-kvm-ubuntu-trusty-go_agent
+      version: latest
+    cloud_properties:
+      instance_type: m1.small
+  - name: medium
+    network: cf1
+    size: 1
+    stemcell:
+      name: bosh-openstack-kvm-ubuntu-trusty-go_agent
+      version: latest
+    cloud_properties:
+      instance_type: m1.medium
+  - name: large
+    network: cf1
+    size: 1
+    stemcell:
+      name: bosh-openstack-kvm-ubuntu-trusty-go_agent
+      version: latest
+    cloud_properties:
+      instance_type: m1.large
+  - name: runner
+    network: cf1
+    size: 1
+    stemcell:
+      name: bosh-openstack-kvm-ubuntu-trusty-go_agent
+      version: latest
+    cloud_properties:
+      instance_type: m1.large
+  - name: router
+    network: cf1
+    size: 0
+    stemcell:
+      name: bosh-openstack-kvm-ubuntu-trusty-go_agent
+      version: latest
+    cloud_properties:
+      instance_type: m1.medium
+
+jobs:
+  - name: nats
+    templates: 
+      - name: nats
+        release: cf
+      - name: nats_stream_forwarder
+        release: cf
+      - name: metron_agent
+        release: cf
+
+    instances: 1
+    resource_pool: medium
+    networks:
+      - name: cf1
+        default: 
+         - gateway
+         - dns
+    properties:
+      networks:
+        apps: cf1
+      metron_agent:
+        zone: z1
+    update: {}
+
+
+  - name: ha_proxy
+    templates:
+      - name: haproxy
+        release: cf
+      - name: metron_agent
+        release: cf
+    instances: 1
+    resource_pool: small
+    networks:
+      - name: floating
+        static_ips:
+         - 172.24.4.2
+      - name: cf1
+        default:
+         - gateway
+         - dns
+#      - name:       
+#    default_networks:
+#      - name: cf1
+#        default:
+#         - gateway
+#         - dns
+    properties:
+      ha_proxy:
+        ssl_pem: |
+          -----BEGIN CERTIFICATE-----
+          MIIDuzCCAqOgAwIBAgIJAK6D7xAtcj49MA0GCSqGSIb3DQEBCwUAMHQxCzAJBgNV
+          BAYTAklOMQswCQYDVQQIDAJBUDEMMAoGA1UEBwwDSFlEMQ8wDQYDVQQKDAZ2ZWRh
+          bXMxDzANBgNVBAsMBnZlZGFtczENMAsGA1UEAwwEcG9zYTEZMBcGCSqGSIb3DQEJ
+          ARYKdmVkYW1zLmNvbTAeFw0xNTA0MTUxMzM3MDJaFw0xNjA0MTQxMzM3MDJaMHQx
+          CzAJBgNVBAYTAklOMQswCQYDVQQIDAJBUDEMMAoGA1UEBwwDSFlEMQ8wDQYDVQQK
+          DAZ2ZWRhbXMxDzANBgNVBAsMBnZlZGFtczENMAsGA1UEAwwEcG9zYTEZMBcGCSqG
+          SIb3DQEJARYKdmVkYW1zLmNvbTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoC
+          ggEBALgcfLz53DPTDpRanNTrDEfXJ3GbfCxZaD/XMXnhMghrwjRjmakq6t++sIoy
+          wD5nQBnIP42io5E5h/CPYgdJY08CvkLIkNwXvMhRIrYVKRqi4c1KHaYTDQkGWT5S
+          mc+g0Xz/vGOiVDZAUEA0ymrTJYh5RiqxI9A/9hoKW9NhYzUtjM+BYqu6Ag2lLelH
+          u6S922+kkJ0JrqJh95I/uflYZ/9x+qbiVzn0jfO4cpLW89XnXG0sUsk9aC9bL7bD
+          oqDFoU+3EnakJ4mhKcKoQ2Da15CMRhWuSh7o2/H0/K1XEBN8EdgBWMTyuUpT0Lt0
+          ZnyQlz4iUwfNyQrBAp0kDKbPXlECAwEAAaNQME4wHQYDVR0OBBYEFMZ8Y6/PC1JA
+          dEe2SZvW480+SUOwMB8GA1UdIwQYMBaAFMZ8Y6/PC1JAdEe2SZvW480+SUOwMAwG
+          A1UdEwQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEBAKKTrZSlEJTBeqKX4M2jpLFx
+          vD0IM39BwWpjgxTHpUZvRhRMYKXVV5W5dlZJfBsNQ6YU5W3sOh0sUPqpZN4cNcSg
+          KEwepUmXBKhIWNdSwdbT2UKzzDPbWSM/q1gr79Bk0FMegKgBzs8cEpAYQUa4y3WK
+          LOOp/pnF6HVfJyERghyNkru1PEBVwQVEM7N36S5p4iW7xB3nvmtqSPJLk8lvzR1w
+          8Ktfz0dLCjSeZXifmDoURqucbWrQ4/DsgDqXtlPiD5h3MVqKQdh6jz0CfW+tNVRV
+          Zo7+B75HVdy4X/u1lxsugusYnSTpLnYPJEyUXOtPao7SozSLRKqV8mvhlfYe0gc=
+          -----END CERTIFICATE-----
+          -----BEGIN PRIVATE KEY-----
+          MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC4HHy8+dwz0w6U
+          WpzU6wxH1ydxm3wsWWg/1zF54TIIa8I0Y5mpKurfvrCKMsA+Z0AZyD+NoqOROYfw
+          j2IHSWNPAr5CyJDcF7zIUSK2FSkaouHNSh2mEw0JBlk+UpnPoNF8/7xjolQ2QFBA
+          NMpq0yWIeUYqsSPQP/YaClvTYWM1LYzPgWKrugINpS3pR7ukvdtvpJCdCa6iYfeS
+          P7n5WGf/cfqm4lc59I3zuHKS1vPV51xtLFLJPWgvWy+2w6KgxaFPtxJ2pCeJoSnC
+          qENg2teQjEYVrkoe6Nvx9PytVxATfBHYAVjE8rlKU9C7dGZ8kJc+IlMHzckKwQKd
+          JAymz15RAgMBAAECggEASE+H/oD0J7ahZ0sfhdC7hgvPBiPXZWPIOiq+1+vGxt/r
+          6r+jvnmIvlAa7mx4bQoIdxfbPjm+nG9IIQdvrQT56DJfn8M+gfMgxlx3kaRF/Jw0
+          q3iMpIme+QhxTLUMjCvRm5Kl30wGXzhrTIxvY/2CJFPdZy8jrcsxUZD399GsMVoD
+          nqASNx2d2LaloKvX6s1yH+Jkb9FDyqdJyOZyha8cHTqMFa8kjg/y+rET9UwZTCOi
+          B1f3VRxv/vsLQW9QtWkKa8beGB9SGnRL44eevfufIXeJZhE7LOK2u6oiZtbszgOT
+          TheA/q9L7Pt104IhWby2Zj4A0SleOr0N5t4NDzGAAQKBgQDomzzKdRijxvu2i3PQ
+          +NaAjzBKLSeBPh42OaW4ByLpfpzeTapHXbRmG33AHigFXY8IVDSXhgik261O3WAK
+          phR88KivD+Zzjnk6Q60D644NO0Qy+tVNce2tGThLoZopVW1aBt6fVPTOaTcoJW19
+          m8IbSRvg83YflZlqvLTvIQMoUQKBgQDKoK2coyiURwPeVIs6cuHGtrefpacGU3xS
+          T7pREnTPVno8DYVMFDgwVPJYpKkOxWT1L9KgrVkSxzeLCKAAewNBNJh0W9OZ3buf
+          2nI27ccH3aEUSErzi2LR7lSPdbSCwoJkapaepGHnkxrM9RuCKUUI1k8jMv4ygdAG
+          l42W4vFWAQKBgQDI+cA3qZ8FexrnqWwDJc2oPI/bt1IH0FUoQvzVmYzntBbz2KUE
+          jokdJCmtwiCQKjs4VhEuzodPceM3Xfzqln7jSMhmodVbCMHjvq+R0IfnFMsjRSjh
+          hkt2oXDLoDBkAETAYWkev7fZVH1suZH10ouPKcblwVXRil+JIs0uRBbHUQKBgQDI
+          6Jpbpjc1FljSmLdX49LTahYVeHVsw1iQcLcHbapebptScgGKFr5DxeZpWBK8L6LT
+          rXBFmrun79m1xH6JG291tsW3Edl0RbOkYz8+EXN37Bur9aZDZyA7kPlNKWMrB9ur
+          3zeq4sikiWpYcGuvGmZ1xbC/8O60e5wc/SYJxsmOAQKBgEM7/nFzcuXkNgZh2O56
+          b2V60BUTQrKHV0suT2e2OirnFvY9gzlcGM29zKJjnw6cT0uKv9h5h55Seeu0e02A
+          SClYWJ6B8UBpewcOZC5aBbP8zWrlYsZefY8yIKFVNG42758peNEir9xlDRsZdRh/
+          W2SeGzwLlB8LiEskxKh4lYjW
+          -----END PRIVATE KEY-----
+ 
+      metron_agent:
+        zone: z1
+      networks:
+        apps: cf1
+      router:
+        servers:
+          z1:
+            - 0.router.cf1.v206-mycf-11-openstack.microbosh
+          z2: []
+
+  - name: hm
+    templates:
+      - name: nats
+        release: cf
+      - name: hm9000
+        release: cf
+      - name: etcd
+        release: cf
+      - name: etcd_metrics_server
+        release: cf
+      - name: metron_agent
+        release: cf
+    instances: 1
+    resource_pool: small
+    networks:
+      - name: cf1
+        default:
+        - dns
+        - gateway
+    properties:
+      metron_agent:
+        zone: z1
+      networks:
+        apps: cf1
+      etcd_metrics_server:
+        nats:
+          machines:
+            - 0.hm.cf1.v206-mycf-11-openstack.microbosh
+          port: 30010
+          username: nttlabs
+          password: c1oudc0w
+
+  - name: log-ctl
+    templates:
+      - name: loggregator_trafficcontroller
+        release: cf
+      - name: nats
+        release: cf
+      - name: etcd
+        release: cf
+      - name: etcd_metrics_server
+        release: cf
+      - name: metron_agent
+        release: cf
+    instances: 1
+    resource_pool: small
+    networks:
+      - name: cf1
+        default:
+        - dns
+        - gateway
+    properties:
+      metron_agent:
+        zone: z1
+      networks:
+        apps: cf1
+      traffic_controller:
+        zone: z1
+      etcd_metrics_server:
+        nats:
+          machines:
+            - 0.log-ctl.cf1.v206-mycf-11-openstack.microbosh
+          port: 30010
+          username: nttlabs
+          password: c1oudc0w
+          authorization_timeout: 10
+          use_gnatsd: false
+  - name: log-svr
+    templates:
+      - name: doppler
+        release: cf
+      - name: nats
+        release: cf
+      - name: etcd
+        release: cf
+      - name: etcd_metrics_server
+        release: cf
+    instances: 1
+    resource_pool: small
+    networks:
+      - name: cf1
+        default:
+        - dns
+        - gateway
+    properties:
+      doppler:
+        zone: z1
+      networks:
+        apps: cf1
+      etcd_metrics_server:
+        nats:
+          machines:
+            - 0.log-svr.cf1.v206-mycf-11-openstack.microbosh
+          port: 30010
+          username: nttlabs
+          password: c1oudc0w
+
+  - name: db
+    templates:
+      - name: postgres
+        release: cf
+      - name: metron_agent
+        release: cf
+    instances: 1
+    resource_pool: small
+    networks:
+      - name: cf1
+        default:
+          - gateway
+          - dns
+    persistent_disk: 4096
+    properties:
+      metron_agent:
+        zone: z1
+      db: databases
+
+  - name: uaa
+    templates:
+      - name: uaa
+        release: cf
+      - name: metron_agent
+        release: cf
+    instances: 1
+    resource_pool: small
+    networks:
+      - name: cf1
+        default:
+          - gateway
+          - dns
+    properties:
+      metron_agent:
+        zone: z1
+      networks:
+        apps: cf1
+
+  - name: cc
+    templates:
+      - name: cloud_controller_ng
+        release: cf
+      - name: cloud_controller_clock
+        release: cf
+      - name: cloud_controller_worker
+        release: cf
+      - name: metron_agent
+        release: cf
+    instances: 1
+    resource_pool: small
+    networks:
+      - name: cf1
+        default:
+          - gateway
+          - dns
+    properties:
+      metron_agent:
+        zone: z1
+      networks:
+        apps: cf1
+      db: ccdb
+
+  - name: dea
+    templates:
+      - name: dea_next
+        release: cf
+      - name: dea_logging_agent
+        release: cf
+      - name: metron_agent
+        release: cf
+    instances: 1
+    resource_pool: runner
+    networks:
+      - name: cf1
+        default:
+          - gateway
+          - dns
+    properties:
+      dea_next:
+        zone: z1
+      metron_agent:
+        zone: z1
+      networks:
+        apps: cf1
+    update:
+      max_in_flight: 1
+
+  - name: router
+    templates:
+      - name: gorouter
+        release: cf
+      - name: metron_agent
+        release: cf
+    instances: 1
+    resource_pool: small
+    networks:
+      - name: cf1
+        default:
+          - gateway
+          - dns
+    properties:
+      metron_agent:
+        zone: z1
+      networks:
+        apps: cf1
+
+properties:
+  domain: 172.24.4.2.xip.io
+  system_domain: 172.24.4.2.xip.io
+  system_domain_organization: system_domain
+  app_domains:
+    - 172.24.4.2.xip.io
+
+  networks:
+    apps: cf1
+    management: cf1
+
+  nats:
+    port: 30010
+    user: nttlabs
+    password: c1oudc0w
+    address: 0.hm.cf1.v206-mycf-11-openstack.microbosh
+    machines:
+      - 0.hm.cf1.v206-mycf-11-openstack.microbosh
+      - 0.logctl.cf1.v206-mycf-11-openstack.microbosh
+      - 0.logsvr.cf1.v206-mycf-11-openstack.microbosh
+    monitor_port: 0
+    debug: false
+    prof_port: 0
+    trace: false
+
+  ssl:
+    skip_cert_verify: true
+
+  router:
+    status:
+      user: gorouter
+      password: c1oudc0w
+    client_inactivity_timeout: 120
+    app_inactivity_timeout: 120
+    requested_route_registration_interval_in_seconds: 20
+
+  dea_next:
+    allow_networks: null
+    deny_networks: null
+    advertise_interval_in_seconds: 5
+    heartbeat_interval_in_seconds: 10
+
+  databases:
+    databases:
+      - tag: cc
+        name: ccdb
+        citext: true
+      - tag: uaa
+        name: uaadb
+        citext: true
+    roles:
+      - tag: admin
+        name: ccadmin
+        password: c1oudc0w
+      - tag: admin
+        name: uaaadmin
+        password: c1oudc0w
+    db_scheme: postgres
+    address: 0.db.cf1.v206-mycf-11-openstack.microbosh
+    port: 5524
+
+  ccdb: &ccdb
+    db_scheme: postgres
+    address: 0.db.cf1.v206-mycf-11-openstack.microbosh
+    port: 5524
+    databases:
+      - tag: cc
+        name: ccdb
+        citext: true
+    roles:
+      - tag: admin
+        name: ccadmin
+        password: c1oudc0w
+
+  ccdb_ng: *ccdb
+
+  uaadb:
+    db_scheme: postgresql
+    address: 0.db.cf1.v206-mycf-11-openstack.microbosh
+    port: 5524
+    databases:
+      - tag: uaa
+        name: uaadb
+        citext: true
+    roles:
+      - tag: admin
+        name: uaaadmin
+        password: c1oudc0w
+
+  cc: &cc
+    default_fog_connection:
+      local_root: /var/vcap/data
+    logging_level: debug2
+    srv_api_uri: http://api.172.24.4.2.xip.io
+    db_encryption_key: c1oudc0w
+    bulk_api_password: c1oudc0w
+    staging_upload_user: uploaduser
+    staging_upload_password: c1oudc0w
+    resource_pool:
+      cdn: null
+      fog_connection: null
+      resource_directory_key: 172.24.4.2.xip.io-cc-resources
+    packages:
+      app_package_directory_key: 172.24.4.2.xip.io-cc-packages
+      cdn: null
+      fog_connection: null
+      max_package_size: 1073741824
+    droplets:
+      cdn: null
+      droplet_directory_key: 172.24.4.2.xip.io-cc-droplets
+      fog_connection: null
+    app_events:
+      cutoff_age_in_days: 31
+    app_usage_events:
+      cutoff_age_in_days: 31
+    audit_events:
+      cutoff_age_in_days: 31
+    default_app_memory: 1024
+    jobs:
+      app_bits_packer:
+        timeout_in_seconds: null
+      app_events_cleanup:
+        timeout_in_seconds: null
+      app_usage_events_cleanup:
+        timeout_in_seconds: null
+      blobstore_delete:
+        timeout_in_seconds: null
+      blobstore_upload:
+        timeout_in_seconds: null
+      droplet_deletion:
+        timeout_in_seconds: null
+      droplet_upload:
+        timeout_in_seconds: null
+      generic:
+        number_of_workers: null
+#      generic:
+#        collocate_cc:
+#          number_of_workers: 1
+      global:
+        timeout_in_seconds: 14400
+      model_deletion:
+        timeout_in_seconds: null
+    allowed_cors_domains: []
+    billing_event_writing_enabled: true
+    broker_client_timeout_seconds: 70
+    buildpacks:
+      buildpack_directory_key: 172.24.4.2.xip.io-cc-buildpack
+      cdn: null
+      fog_connection: null
+    client_max_body_size: 1536M
+    db_logging_level: debug2
+    default_app_disk_in_mb: 1024
+    default_buildpacks:
+      - name: java_buildpack
+        package: buildpack_java
+      - name: ruby_buildpack
+        package: buildpack_ruby
+      - name: nodejs_buildpack
+        package: buildpack_nodejs
+      - name: go_buildpack
+        package: buildpack_go
+      - name: python_buildpack
+        package: buildpack_python
+      - name: php_buildpack
+        package: buildpack_php
+    default_quota_definition: default
+    default_running_security_groups:
+      - public_networks
+      - dns
+    default_staging_security_groups:
+      - public_networks
+      - dns
+    development_mode: false
+    diego:
+      running: disabled
+      staging: disabled
+    diego_docker: false
+    directories: null
+    disable_custom_buildpacks: false
+    external_host: api
+    install_buildpacks:
+      - name: java_buildpack
+        package: buildpack_java
+      - name: ruby_buildpack
+        package: buildpack_ruby
+      - name: nodejs_buildpack
+        package: buildpack_nodejs
+      - name: go_buildpack
+        package: buildpack_go
+      - name: python_buildpack
+        package: buildpack_python
+      - name: php_buildpack
+        package: buildpack_php
+    internal_api_password: c1oudc0w
+    internal_api_user: internal_user
+    maximum_app_disk_in_mb: 2048
+    newrelic:
+      capture_params: false
+      developer_mode: false
+      environment_name: null
+      license_key: null
+      monitor_mode: false
+      transaction_tracer:
+        enabled: true
+        record_sql: obfuscated
+    quota_definitions:
+      default:
+        memory_limit: 10240
+        non_basic_services_allowed: true
+        total_routes: 1000
+        total_services: 100
+    security_group_definitions:
+      - name: public_networks
+        rules:
+          - destination: 0.0.0.0-9.255.255.255
+            protocol: all
+          - destination: 11.0.0.0-169.253.255.255
+            protocol: all
+          - destination: 169.255.0.0-172.15.255.255
+            protocol: all
+          - destination: 172.32.0.0-192.167.255.255
+            protocol: all
+          - destination: 192.169.0.0-255.255.255.255
+            protocol: all
+      - name: dns
+        rules:
+          - destination: 0.0.0.0/0
+            ports: "53"
+            protocol: tcp
+          - destination: 0.0.0.0/0
+            ports: "53"
+            protocol: udp
+    stacks: null
+    system_buildpacks:
+      - name: java_buildpack
+        package: buildpack_java
+      - name: ruby_buildpack
+        package: buildpack_ruby
+      - name: nodejs_buildpack
+        package: buildpack_nodejs
+      - name: go_buildpack
+        package: buildpack_go
+      - name: python_buildpack
+        package: buildpack_python
+      - name: php_buildpack
+        package: buildpack_php
+    thresholds:
+      api:
+        alert_if_above_mb: null
+        restart_if_above_mb: null
+        restart_if_consistently_above_mb: null
+      worker:
+        alert_if_above_mb: null
+        restart_if_above_mb: null
+        restart_if_consistently_above_mb: null
+    user_buildpacks: []
+    clock:
+      collocate_cc: true
+    hm9000_noop: false
+    local_route: 127.0.0.1
+
+  ccng: *cc
+
+  login:
+#    analytics:
+#      code: null
+#      domain: null
+#    asset_base_url: null
+#    brand: oss
+#    catalina_opts: -Xmx768m -XX:MaxPermSize=256m
+    enabled: false
+#    invitations_enabled: null
+#    links:
+#      home: https://console.172.24.4.2.xip.io
+#      network: null
+#      passwd: https://console.172.24.4.2.xip.io/password_resets/new
+#      signup: https://console.172.24.4.2.xip.io/register
+#      signup-network: null
+#    messages: null
+#    notifications:
+#      url: null
+#    protocol: http
+#    saml: null
+#    signups_enabled: null
+#    smtp:
+#      host: null
+#      password: null
+#      port: null
+#      user: null
+#    spring_profiles: null
+#    tiles: null
+#    uaa_base: null
+#    uaa_certificate: null
+#    url: null
+
+  uaa:
+    url: http://uaa.172.24.4.2.xip.io
+    spring_profiles: postgresql
+    no_ssl: true
+    catalina_opts: -Xmx768m -XX:MaxPermSize=256m
+    jwt:
+      signing_key: '-----BEGIN RSA PRIVATE KEY-----MIIEpQIBAAKCAQEAqUR7hyHhjeb+hSauhtOJfgE6h+xNXcr9593EOkIHmH6MX9VC0R/6zpZ2ENYmuM82EPosWBiWRdAh0I+qfI6vDLRo7ril/ziKeb/7mqDeDlgW9HTAtDOsDV1iGuUFDvrvKQxesVgMGNGu+74JZjt1v1ZdBf5GkjvvPDU+ZHGc4pAnMnmuL79Z2FTBgDI7yGFFTRIpLk9oCWfYdBBAjZbtXoVrcfYWfznP0S/rdcVbX2QQPCecOrkACr/WExwkIPC7pDshBQan8ZLXmOrJJorKIcmVGSziw/bsUeV7V8xk2Fz64wyvWDUoRbb+MIGTlC9gWqcrG3rgbFAARsr3kjseLQIDAQABAoIBAEU4lU+44lW2nmVzYTIP9g1KkVYeo7D0n4sf3Ox6LkMFlYBnZTDCZD3xuAzAlwtC6fhdZp8MRv/70qhI6E6RxzJp4POnHXNW+wI5KbqdiNHS4mhMCrZm3ziD9OfMupnass1Vmq/psuC/d1DJ8WwWatu5hMc7qj6JNheoKoDHGYJpCOKHIPHRoJ/US3BVzevk8ssamJ8y/Km0kkI1RKqvlmAwo8d2IuQJ0xAx2cISMteInajbAloDcbO7aXevz3mIzHrFJquLaY0YJyCXydDEf8Guo0yWuLBzZA0mThTYbyfdjPLaaCJadhScQfwI/8rp0D/cculKE697E1SRWYELSN0CgYEA1KnYSNnNBgNaKKvdMA4Lzpzm9pxWARC+NktD97IB5qJJMifA7TQ7oPqtqid35v1tq1U4KsTuR7Ehvl1EtcsUncVeR3YucosKhMQzfwcFMLFtr8ASMtYf5bnMMKy2J8A7hT4Ad/k/qvrpdnb3n8s29x6cr6OCvqkCbuV4ucVajWMCgYEAy8LFyyZVpMoSSHkUrFh8UGnL2m/bz9NGOjLjqMTFElo+CfgIm6MJCt/5vXPSoLcrom5J5cXvInXSuyu1h6KRgb1W0Ek4WO2+Azfpv4x1RSujksn6iG4toy66hAQxAzdvXdGHBmQj0ksw9aeSarnVmjqv/WyrZG4ByPm78R0xAy8CgYEAj5T9CnLDEkRBIySmekOBhUY6SlbTWnTLeCzo/tuYnPcFJG/iukSB3fZiOnfbZIHHAd7PxVCg8JaPic+/DF7I1JzlQqpwQbXOrEUr36AFyRKCVB8CKoCXmKsRSevSMJSBmzx5ZIdMjUxLREied6zkt4Rbldp38/J4Shd0ozi0IrECgYEAnR/X+JzaBBYS3TIJYBFn43aBzTLe1Tb9e5mMdrMtqMZP+s36jVG+glVOtuoerPIywrG7aGUmz3L+CnldJXeWLu67iCg+PE0wbjjqllwQfkN1gpcgC56ysJgzGeRFi05vIXCWZ7ZG7T4wRe5veL9O2PySg6EN1YcC92Ckrfyts98CgYEAgFHsBoa6dTT02PBMUzkcNjfkkxNX+qsxTMYM0xEA4NZK2boloFPL/aP3xN9DkScFKtC6AwfE1MNmgMPfVxJxHYqRVYp7XVR54y30OAR9Hgd6yFpe6h635OI2ctWWXbhjppiEeuf0NedcuE0PP19iW8Gfdja4OcL9EHWFfF7Hw0E=-----END
+        RSA PRIVATE KEY-----'
+      verification_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCpRHuHIeGN5v6FJq6G04l+ATqH7E1dyv3n3cQ6QgeYfoxf1ULRH/rOlnYQ1ia4zzYQ+ixYGJZF0CHQj6p8jq8MtGjuuKX/OIp5v/uaoN4OWBb0dMC0M6wNXWIa5QUO+u8pDF6xWAwY0a77vglmO3W/Vl0F/kaSO+88NT5kcZzikCcyea4vv1nYVMGAMjvIYUVNEikuT2gJZ9h0EECNlu1ehWtx9hZ/Oc/RL+t1xVtfZBA8J5w6uQAKv9YTHCQg8LukOyEFBqfxkteY6skmisohyZUZLOLD9uxR5XtXzGTYXPrjDK9YNShFtv4wgZOUL2BapysbeuBsUABGyveSOx4t
+        ubuntu@test1
+    cc:
+      client_secret: c1oudc0w
+    admin:
+      client_secret: c1oudc0w
+    batch:
+      username: batchuser
+      password: c1oudc0w
+    authentication:
+      policy:
+        countFailuresWithinSeconds: null
+        lockoutAfterFailures: null
+        lockoutPeriodSeconds: null
+    client:
+      autoapprove:
+        - cf
+    clients:
+      app-direct:
+        access-token-validity: 1209600
+        authorities: app_direct_invoice.write
+        authorized-grant-types: authorization_code,client_credentials,password,refresh_token,implicit
+        override: true
+        redirect-uri: https://console.172.24.4.2.xip.io
+        refresh-token-validity: 1209600
+        secret: app-direct_secret
+      cloud_controller_username_lookup:
+        secret: app-direct_secret
+      developer_console:
+        access-token-validity: 1209600
+        authorities: scim.write,scim.read,cloud_controller.read,cloud_controller.write,password.write,uaa.admin,uaa.resource,cloud_controller.admin,billing.admin
+        authorized-grant-types: authorization_code,client_credentials
+        override: true
+        redirect-uri: https://console.172.24.4.2.xip.io/oauth/callback
+        refresh-token-validity: 1209600
+        scope: openid,cloud_controller.read,cloud_controller.write,password.write,console.admin,console.support
+        secret: developer_console_secret
+      doppler:
+        authorities: uaa.resource
+        override: true
+        secret: c1oudc0w
+      login:
+        authorities: oauth.login,notifications.write,critical_notifications.write,emails.write
+        authorized-grant-types: authorization_code,client_credentials,refresh_token
+        override: true
+        redirect-uri: https://login.172.24.4.2.xip.io
+        scope: openid,oauth.approvals
+        secret: login_client_secret
+      notifications:
+        authorities: cloud_controller.admin,scim.read
+        authorized-grant-types: client_credentials
+        secret: notification_secret
+      servicesmgmt:
+        authorities: uaa.resource,oauth.service,clients.read,clients.write,clients.secret
+        authorized-grant-types: authorization_code,client_credentials,password,implicit
+        autoapprove: true
+        override: true
+        redirect-uri: https://servicesmgmt.172.24.4.2.xip.io/auth/cloudfoundry/callback
+        scope: openid,cloud_controller.read,cloud_controller.write
+        secret: service_mgmt_secret
+      space-mail:
+        access-token-validity: 1209600
+        authorities: scim.read,scim.write,cloud_controller.admin
+        authorized-grant-types: client_credentials
+        override: true
+        refresh-token-validity: 1209600
+        secret: space-mail_secret
+      support-services:
+        access-token-validity: 1209600
+        authorities: portal.users.read
+        authorized-grant-types: authorization_code,client_credentials
+        redirect-uri: https://support-signon.172.24.4.2.xip.io
+        refresh-token-validity: 1209600
+        scope: scim.write,scim.read,openid,cloud_controller.read,cloud_controller.write
+        secret: support-services_secret
+    ldap: null
+    login: null
+    scim:
+      external_groups: null
+      userids_enabled: false
+      users:
+        - admin|c1oudc0w|scim.write,scim.read,openid,cloud_controller.admin,doppler.firehose
+    user: null
+
+  logger_endpoint:
+#    use_ssl: true
+    use_ssl: false
+    port: 80
+#    port: 4443
+
+  loggregator:
+    blacklisted_syslog_ranges: []
+    debug: false
+    maxRetainedLogMessages: 100
+
+  loggregator_endpoint:
+    shared_secret: c1oudc0w
+    host: 0.log-ctl.cf1.v206-mycf-11-openstack.microbosh
+
+  etcd:
+    machines:
+      - 0.hm.cf1.v206-mycf-11-openstack.microbosh
+      - 0.log-ctl.cf1.v206-mycf-11-openstack.microbosh
+      - 0.log-svr.cf1.v206-mycf-11-openstack.microbosh
+
+  uaa_client_id: cf
+  uaa_endpoint: http://uaa.172.24.4.2.xip.io
+  uaa_client_auth_credentials:
+    username: paas.admin@nttlabs
+    password: c1oudc0w
+
+  acceptance_tests: null
+  collector: null
+  description: Cloud Foundry sponsored by Pivotal
+  disk_quota_enabled: true
+  doppler:
+    blacklisted_syslog_ranges: null
+    debug: false
+    maxRetainedLogMessages: 100
+  doppler_endpoint:
+    shared_secret: c1oudc0w
+  dropsonde:
+    enabled: true
+  etcd_metrics_server:
+    nats:
+      machines:
+        - 0.hm.cf1.v206-mycf-11-openstack.microbosh
+      password: c1oudc0w
+      username: nttlabs
+  hm9000:
+    url: http://hm9000.172.24.4.2.xip.io
+  metron_endpoint:
+    shared_secret: c1oudc0w
+#  nfs_server:
+#    address: 0.nfs.cf1.v206-cf-openstack.microbosh
+#    allow_from_entries:
+#    - null
+#    - null
+#    share: null
+  request_timeout_in_seconds: 900
+  smoke_tests: null
+  support_address: https://support.cloudfoundry.com
+  syslog_daemon_config: null
