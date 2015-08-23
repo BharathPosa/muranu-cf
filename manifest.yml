@@ -3,10 +3,10 @@ name: microbosh
 
 network:
   type: manual
-  vip:  172.24.4.1 
+  vip:  	172.24.4.6 
   ip: 10.0.0.3 
   cloud_properties:
-    net_id: b7485090-bd7b-45a2-8d07-82335a728e39
+    net_id: 417ea3fb-32bb-4791-8d79-4bc43c129685
 
 resources:
  
@@ -18,7 +18,7 @@ cloud:
   plugin: openstack
   properties:
     openstack:
-      auth_url:         http://192.168.2.191:5000/v2.0        
+      auth_url: http://172.16.2.17:5000/v2.0        
       tenant: admin # Replace with OpenStack tenant name
       username: admin # Replace with OpenStack username
       api_key: vedams123 # Replace with your OpenStack password
