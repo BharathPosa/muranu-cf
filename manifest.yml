@@ -23,7 +23,7 @@ cloud:
       username: admin # Replace with OpenStack username
       api_key: vedams123 # Replace with your OpenStack password
       default_key_name: microbosh # OpenStack Keypair name
-      private_key: /muranu-cf/microbosh.pem # Path to OpenStack Keypair private key
+      private_key: muranu-cf/microbosh.pem # Path to OpenStack Keypair private key
       default_security_groups: ["ssh","bosh"]
 
 apply_spec:
