@@ -3,7 +3,7 @@ name: microbosh
 
 network:
   type: manual
-  vip:  	172.24.4.6 
+  vip:  172.24.4.10 
   ip: 10.0.0.3 
   cloud_properties:
     net_id: 417ea3fb-32bb-4791-8d79-4bc43c129685
