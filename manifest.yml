@@ -6,7 +6,7 @@ network:
   vip:  172.24.4.1 
   ip: 10.0.0.3 
   cloud_properties:
-    net_id: 22d138c7-a9eb-47eb-98e5-73eb25c8967c
+    net_id: b7485090-bd7b-45a2-8d07-82335a728e39
 
 resources:
  
